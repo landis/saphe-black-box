@@ -1,9 +1,14 @@
 #include <Wire.h>
+
+//sensor
 #include <Adafruit_BMP085.h>
+
+//lcd display
 #include <LiquidCrystal.h>
 #include <Math.h>
+
+//sd card
 #include "RTClib.h"
-//SD Card datalogger library and setup
 #include <SD.h>
 
 #define LOG_INTERVAL 1000
@@ -60,9 +65,8 @@ float mToFt(int m) {
 void error(char *str) {
   Serial.print("error: ");
   Serial.println(str);
-  
+  //turn on warning light on logger
   digitalWrite(redLEDpin, HIGH);
-  
   while(1);
 }
 
@@ -73,6 +77,8 @@ void setup() {
   pinMode(redLEDpin, OUTPUT);
   pinMode(greenLEDpin, OUTPUT);
   pinMode(10, OUTPUT);
+  digitalWrite(redLEDpin, LOW);
+  digitalWrite(greenLEDpin, LOW);
   if (!SD.begin(chipSelect)) {
     Serial.println("Card failed, or not present");
     // don't do anything more:
@@ -80,10 +86,10 @@ void setup() {
   }
   Serial.println("card initialized.");
 
-//BMP085
+//BMP085 start
   bmp.begin();
 
-//LCD
+//LCD start
   lcd.createChar(0, degrSym);
   lcd.begin(16, 2);
 }
@@ -93,7 +99,7 @@ void loop() {
     delay((LOG_INTERVAL -1) - (millis() % LOG_INTERVAL));
     
     digitalWrite(greenLEDpin, HIGH);
-    
+    //grab curent time from realtime clock
     now = RTC.now();
     
   //initialize BMP085 variables
@@ -101,9 +107,6 @@ void loop() {
     int presPa = 0;
     int meters = 0;
     float tempf = 0.0;
-
-  //initialize logger variables
-    String dataString = "";
 
   //read sensor values into variables
     tempC = bmp.readTemperature();
@@ -119,11 +122,9 @@ void loop() {
     Serial.println(" *C");
     Serial.print(tempF);
     Serial.println(" *F");
-
     Serial.print("Pressure = ");
     Serial.print(presPa);
     Serial.println(" Pa");
-
     Serial.println();
 
   //output to lcd screen
@@ -131,27 +132,27 @@ void loop() {
     lcd.print(tempF,1);
     lcd.write(byte(0));
     lcd.print("F");
-
     lcd.setCursor(8,0);
     lcd.print(paToInHg(bmp.readPressure()));
     lcd.print(" Hg");
-
-    //lcd.rightToLeft();
-    lcd.setCursor(7,1);
     if (feet <= 9)
-      lcd.print(" ");
-    if (feet <= 99)
-      lcd.print(" ");
-    lcd.print(feet);
-    lcd.print(" ft");
+      lcd.setCursor(12,1);
+      lcd.print(feet);
+      lcd.print(" ft");
+    if (feet <= 99 && feet > 9)
+      lcd.setCursor(11,1);
+      lcd.print(feet);
+      lcd.print(" ft");
+    if (feet <=999 && feet > 99)
+      lcd.setCursor(10,1);
+      lcd.print(feet);
+      lcd.print(" ft");
+    if (feet <=9999 && feet > 999)
+      lcd.setCursor(9,1);
+      lcd.print("Seek O2");
 
 // log to sd card
-  File dataFile = SD.open("LOG.CSV", FILE_WRITE)
-  
-  ;
- 
-  Serial.print("Logging to: ");
-  Serial.println(dataFile);
+  File dataFile = SD.open("LOG.CSV", FILE_WRITE);
   
   if (dataFile) {
     dataFile.print(now.unixtime());
@@ -168,89 +169,22 @@ void loop() {
     dataFile.print(":");
     dataFile.print(now.second(), DEC);
     dataFile.print(",");
+    dataFile.print(tempC);
+    dataFile.print(",");
     dataFile.print(tempF);
     dataFile.print(",");
     dataFile.print(bmp.readPressure());
+    dataFile.print(",");
+    dataFile.print(paToInHg(bmp.readPressure()));
+    dataFile.print(",");
+    dataFile.print(meters);
     dataFile.print(",");
     dataFile.println(feet);
     dataFile.close();
     
     digitalWrite(greenLEDpin, LOW);
-    
-    
-    
-    Serial.println(tempF);
   }
   else {
     Serial.println("error opening datalog.txt");
   }
-  
-    delay(500);
 }
-
-
-
-// printFloat prints out the float 'value' rounded to 'places' places after the decimal point
-float printFloat(float value, int places) {
-  // this is used to cast digits
-  int digit;
-  float tens = 0.1;
-  int tenscount = 0;
-  int i;
-  float tempfloat = value;
-
-    // make sure we round properly. this could use pow from <math.h>, but doesn't seem worth the import
-  // if this rounding step isn't here, the value  54.321 prints as 54.3209
-
-  // calculate rounding term d:   0.5/pow(10,places)
-  float d = 0.5;
-  if (value < 0)
-    d *= -1.0;
-  // divide by ten for each decimal place
-  for (i = 0; i < places; i++)
-    d/= 10.0;
-  // this small addition, combined with truncation will round our values properly
-  tempfloat +=  d;
-
-  // first get value tens to be the large power of ten less than value
-  // tenscount isn't necessary but it would be useful if you wanted to know after this how many chars the number will take
-
-  if (value < 0)
-    tempfloat *= -1.0;
-  while ((tens * 10.0) <= tempfloat) {
-    tens *= 10.0;
-    tenscount += 1;
-  }
-
-
-  // write out the negative if needed
-  if (value < 0)
-    Serial.print('-');
-
-  if (tenscount == 0)
-    Serial.print(0, DEC);
-
-  for (i=0; i< tenscount; i++) {
-    digit = (int) (tempfloat/tens);
-    Serial.print(digit, DEC);
-    tempfloat = tempfloat - ((float)digit * tens);
-    tens /= 10.0;
-  }
-
-  // if no places after decimal, stop now and return
-  if (places <= 0)
-    return value;
-
-  // otherwise, write the point and continue on
-  Serial.print('.');
-
-  // now write out each decimal place by shifting digits one by one into the ones place and writing the truncated value
-  for (i = 0; i < places; i++) {
-    tempfloat *= 10.0;
-    digit = (int) tempfloat;
-    Serial.print(digit,DEC);
-    // once written, subtract off that digit
-    tempfloat = tempfloat - (float) digit;
-  }
-}
-
