@@ -3,6 +3,11 @@
 #include <LiquidCrystal.h>
 #include <Math.h>
 
+//SD Card datalogger library and setup
+#include <SD.h>
+
+const int chipSelect = 10;
+
 //from adafruit github 
 Adafruit_BMP085 bmp;
 
@@ -22,7 +27,7 @@ byte degrSym[8] = {
   B00000
 };
 
-//declare variables
+//BMP085 declare variables
 float tempC;
 float tempF;
 int presPA;
@@ -47,17 +52,33 @@ float mToFt(int m) {
 
 void setup() {
   Serial.begin(9600);
+//datalogger
+  Serial.print("Initializing SD card...");
+  pinMode(10, OUTPUT);
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    // don't do anything more:
+    return;
+  }
+  Serial.println("card initialized.");
+
+//BMP085
   bmp.begin();  
+
+//LCD
   lcd.createChar(0, degrSym);
   lcd.begin(16, 2);
 }
  
 void loop() {
-  //initialize variables
+  //initialize BMP085 variables
     float tempC = 0;
     int presPa = 0;
     int meters = 0;
     float tempf = 0.0;
+
+  //initialize logger variables
+    String datastring = "";
     
   //read sensor values into variables
     tempC = bmp.readTemperature();
