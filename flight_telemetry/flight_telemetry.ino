@@ -1,190 +1,186 @@
-#include <Wire.h>
 
-//sensor
-#include <Adafruit_BMP085.h>
 
-//lcd display
-#include <LiquidCrystal.h>
-#include <Math.h>
 
-//sd card
-#include "RTClib.h"
-#include <SD.h>
+/*** to use the SD Card datalogger shield with an Arduino Mega:
+     change: #define MEGA_SOFT_SPI 0
+         to: #define MEGA_SOFT_SPI 1
+     in the file libraries\S
+     
+     
+     D\utility\Sd2Card.h 
+***/
+ 
+/*** Configuration options ***/
 
-#define LOG_INTERVAL 1000
-#define SYNC_INTERVAL 1000
-#define ECHO_TO_SERIAL
-#define redLEDpin 2
-#define greenLEDpin 3
-RTC_DS1307 RTC;
+/* Sensors */
+#define ENABLE_BMP085
+#define ENABLE_ADXL
+#define ENABLE_SDLOG
 
-const int chipSelect = 10;
+/* SD Shield */
+#ifdef ENABLE_SDLOG
+  #include <SD.h>
+  #include "RTClib.h"
+  RTC_DS1307 RTC;
+  const int sdCS = 10;
+#endif
 
-//from adafruit github
-Adafruit_BMP085 bmp;
+/* I2C */
+#if defined(ENABLE_BMP085) || defined(ENABLE_ADXL)
+  #include <Wire.h>
+  #include <Math.h>
+  
+  
+#endif
 
-//lcd pins
-//LiquidCrystal lcd(RS, EN, DB4, DB5, DB6, DB7);
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+/* Barometer */
+#ifdef ENABLE_BMP085
+  #include <Adafruit_BMP085.h>
+  Adafruit_BMP085 dps;
+  float Temperature = 0, Pressure = 0, Altitude = 0;
+  uint32_t nextBmp085 = 0;
+#endif /* ENABLE_BMP085 */
 
-//array of degree symbol for lcd
-byte degrSym[8] = {
-  B00110,
-  B01001,
-  B01001,
-  B00110,
-  B00000,
-  B00000,
-  B00000,
-  B00000
+/* Accelerometer */
+#ifdef ENABLE_ADXL
+  #include <ADXL345.h>
+  ADXL345 accel;
+#endif
+
+void setup() 
+{
+  Serial.begin(57600);
+  Serial.println("SAPHE Telemetry Payload");
+  
+  /* Setup the SD Log */
+  #ifdef ENABLE_SDLOG
+    Serial.print("Initializing SD Card...");
+    pinMode(10, OUTPUT);
+    if (!SD.begin(sdCS)) {
+      Serial.println("Card failed, or not present");
+      return;
+    }
+    Serial.println("card initialized.");
+    
+    File logFile = SD.open("LOG.csv", FILE_WRITE);
+    if (logFile)
+    {
+      String header = "ID, timestamp, X, Y, Z, TempC, PressurePA, AltitudeM";
+      logFile.println(header);
+      logFile.close();
+      Serial.println(header);
+    }
+    else
+    {
+      Serial.println("Couldn't open log file");
+    }
+  #endif /* ENABLE_SDLOG */
+    
+  /* I2C */
+  #if defined(ENABLE_BMP085) || defined(ENABLE_ADXL)
+    Wire.begin();
+    delay(1);
+  #endif
+  
+  #if defined(ENABLE_BMP085)
+    dps.begin(BMP085_STANDARD); // Initialize for relative altitude    
+    ;
+    nextBmp085 = millis() + 1000;
+    delay(500);
+  #endif /* ENABLE_BMP085 */
+  
+  #if defined(ENABLE_ADXL)
+    accel = ADXL345();
+    if(accel.EnsureConnected()){
+      Serial.println("Connected to ADXL345");
+    }
+    else {
+      Serial.println("Could not connect to ADXL");
+    }   
+    accel.EnableMeasurements();
+    
+    #endif
+  
+  delay(1000);
 };
 
-//BMP085 declare variables
-float tempC;
-float tempF;
-int presPA;
-float presInHg;
-int meters;
-float feet;
-
-//function to convert Celsius to Fahrenheit
-float cToF(float c) {
-  return ((c * 9.0) / 5.0) + 32.0;
-}
-
-//function to convert Pa to inches Hg
-float paToInHg(float pa) {
-  return pa * 0.000295333727;
-}
-
-//function to convert meters to feet
-float mToFt(int m) {
-  return m * 3.2808399;
-}
-
-void error(char *str) {
-  Serial.print("error: ");
-  Serial.println(str);
-  //turn on warning light on logger
-  digitalWrite(redLEDpin, HIGH);
-  while(1);
-}
-
-void setup() {
-  Serial.begin(9600);
-//datalogger
-  Serial.print("Initializing SD card...");
-  pinMode(redLEDpin, OUTPUT);
-  pinMode(greenLEDpin, OUTPUT);
-  pinMode(10, OUTPUT);
-  digitalWrite(redLEDpin, LOW);
-  digitalWrite(greenLEDpin, LOW);
-  if (!SD.begin(chipSelect)) {
-    Serial.println("Card failed, or not present");
-    // don't do anything more:
-    return;
-  }
-  Serial.println("card initialized.");
-
-//BMP085 start
-  bmp.begin();
-
-//LCD start
-  lcd.createChar(0, degrSym);
-  lcd.begin(16, 2);
-}
-
-void loop() {
-    DateTime now;
-    delay((LOG_INTERVAL -1) - (millis() % LOG_INTERVAL));
-    
-    digitalWrite(greenLEDpin, HIGH);
-    //grab curent time from realtime clock
-    now = RTC.now();
-    
-  //initialize BMP085 variables
-    float tempC = 0;
-    int presPa = 0;
-    int meters = 0;
-    float tempf = 0.0;
-
-  //read sensor values into variables
-    tempC = bmp.readTemperature();
-    tempF = floor(cToF(tempC) * 10 + 0.5) / 10;
-    presPa = bmp.readPressure();
-    presInHg = paToInHg(presPa);
-    meters = bmp.readAltitude(101760);
-    feet = mToFt(meters);
-
-  //ouput to serial
-    Serial.print("Temperature = ");
-    Serial.print(tempC);
-    Serial.println(" *C");
-    Serial.print(tempF);
-    Serial.println(" *F");
-    Serial.print("Pressure = ");
-    Serial.print(presPa);
-    Serial.println(" Pa");
-    Serial.println();
-
-  //output to lcd screen
-    lcd.setCursor(0,0);
-    lcd.print(tempF,1);
-    lcd.write(byte(0));
-    lcd.print("F");
-    lcd.setCursor(8,0);
-    lcd.print(paToInHg(bmp.readPressure()));
-    lcd.print(" Hg");
-    if (feet <= 9)
-      lcd.setCursor(12,1);
-      lcd.print(feet);
-      lcd.print(" ft");
-    if (feet <= 99 && feet > 9)
-      lcd.setCursor(11,1);
-      lcd.print(feet);
-      lcd.print(" ft");
-    if (feet <=999 && feet > 99)
-      lcd.setCursor(10,1);
-      lcd.print(feet);
-      lcd.print(" ft");
-    if (feet <=9999 && feet > 999)
-      lcd.setCursor(9,1);
-      lcd.print("Seek O2");
-
-// log to sd card
-  File dataFile = SD.open("LOG.CSV", FILE_WRITE);
+void loop()
+{
+  #ifdef ENABLE_BMP085
+    if (millis() > nextBmp085) {
+      Temperature = dps.readTemperature();
+      Pressure = dps.readPressure();
+      Altitude = dps.readAltitude();
+      
+      Serial.print("  Temp(C):");
+      Serial.print(Temperature);
+      Serial.print("  Pressure(Pa):");
+      Serial.print(Pressure);
+      Serial.print("  Alt(m):");
+      Serial.println(Altitude);
+    }
+  #endif 
   
-  if (dataFile) {
-    dataFile.print(now.unixtime());
-    dataFile.print(",");
-    dataFile.print(now.year(), DEC);
-    dataFile.print("/");
-    dataFile.print(now.month(), DEC);
-    dataFile.print("/");
-    dataFile.print(now.day(), DEC);
-    dataFile.print(" ");
-    dataFile.print(now.hour(), DEC);
-    dataFile.print(":");
-    dataFile.print(now.minute(), DEC);
-    dataFile.print(":");
-    dataFile.print(now.second(), DEC);
-    dataFile.print(",");
-    dataFile.print(tempC);
-    dataFile.print(",");
-    dataFile.print(tempF);
-    dataFile.print(",");
-    dataFile.print(bmp.readPressure());
-    dataFile.print(",");
-    dataFile.print(paToInHg(bmp.readPressure()));
-    dataFile.print(",");
-    dataFile.print(meters);
-    dataFile.print(",");
-    dataFile.println(feet);
-    dataFile.close();
+  #if defined(ENABLE_ADXL)
+    AccelerometerRaw raw = accel.ReadRawAxis();
+    int xAxisRawData = raw.XAxis;
+    int yAxisRawData = raw.YAxis;
+    int zAxisRawData = raw.ZAxis;
+    AccelerometerScaled scaled = accel.ReadScaledAxis();
+    float xAxisGs = scaled.XAxis;
     
-    digitalWrite(greenLEDpin, LOW);
-  }
-  else {
-    Serial.println("error opening datalog.txt");
-  }
-}
+    Serial.print("X: ");
+    Serial.print(raw.XAxis);
+    Serial.print("   Y: ");
+    Serial.print(raw.YAxis);
+    Serial.print("   Z: ");
+    Serial.println(raw.ZAxis);
+  #endif
+  
+  #ifdef ENABLE_SDLOG
+    DateTime now = RTC.now();
+    String record;
+    String comma = ",";
+    String colon = ":";
+    String slash = "/";
+    String space = " ";
+    String utime;
+    char temp[6];
+    dtostrf(Temperature, 4, 2, temp); 
+    char press[9];
+    dtostrf(Pressure, 8, 1, press); 
+    char alt[8];
+    dtostrf(Altitude, 4, 1, alt); 
+    utime = (String) now.unixtime();
+    char ryear[5];
+    dtostrf(now.year(), 4, 0, ryear);
+    char rmonth[3];
+    dtostrf(now.month(), 1, 0, rmonth);
+    char rday[3];
+    dtostrf(now.day(), 1, 0, rday);
+    char rhour[3];
+    dtostrf(now.hour(), 2, 0, rhour);
+    char rmin[3];
+    dtostrf(now.minute(), 2, 0, rmin);
+    char rsec[3];
+    dtostrf(now.second(), 2, 0, rsec);
+    record = (utime + comma + ryear + slash + rmonth + slash + rday + space + rhour + colon + rmin + colon + rsec + comma +
+              xAxisRawData + comma + yAxisRawData + comma + zAxisRawData + comma +
+              temp + comma + press + comma + alt);
+    File dataFile = SD.open("LOG.csv", FILE_WRITE);
+    if (dataFile)
+    
+    {
+      dataFile.println(record);
+      dataFile.close();
+
+      Serial.println(record);
+    }
+    else
+    {
+      Serial.println("error opening LOG.csv");
+    }
+  #endif
+  
+  delay(1000);
+};
