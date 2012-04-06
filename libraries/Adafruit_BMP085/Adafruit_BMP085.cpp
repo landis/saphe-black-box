@@ -1,16 +1,16 @@
-/*************************************************** 
+/***************************************************
   This is a library for the BMP085 Barometric Pressure & Temp Sensor
 
-  Designed specifically to work with the Adafruit BMP085 Breakout 
+  Designed specifically to work with the Adafruit BMP085 Breakout
   ----> https://www.adafruit.com/products/391
 
-  These displays use I2C to communicate, 2 pins are required to  
+  These displays use I2C to communicate, 2 pins are required to
   interface
-  Adafruit invests time and resources providing this open source code, 
-  please support Adafruit and open-source hardware by purchasing 
+  Adafruit invests time and resources providing this open source code,
+  please support Adafruit and open-source hardware by purchasing
   products from Adafruit!
 
-  Written by Limor Fried/Ladyada for Adafruit Industries.  
+  Written by Limor Fried/Ladyada for Adafruit Industries.
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
@@ -22,7 +22,7 @@ Adafruit_BMP085::Adafruit_BMP085() {
 
 
 void Adafruit_BMP085::begin(uint8_t mode) {
-  if (mode > BMP085_ULTRAHIGHRES) 
+  if (mode > BMP085_ULTRAHIGHRES)
     mode = BMP085_ULTRAHIGHRES;
   oversampling = mode;
 
@@ -73,13 +73,13 @@ uint32_t Adafruit_BMP085::readRawPressure(void) {
 
   write8(BMP085_CONTROL, BMP085_READPRESSURECMD + (oversampling << 6));
 
-  if (oversampling == BMP085_ULTRALOWPOWER) 
+  if (oversampling == BMP085_ULTRALOWPOWER)
     _delay_ms(5);
-  else if (oversampling == BMP085_STANDARD) 
+  else if (oversampling == BMP085_STANDARD)
     _delay_ms(8);
-  else if (oversampling == BMP085_HIGHRES) 
+  else if (oversampling == BMP085_HIGHRES)
     _delay_ms(14);
-  else 
+  else
     _delay_ms(26);
 
   raw = read16(BMP085_PRESSUREDATA);
@@ -224,21 +224,31 @@ float Adafruit_BMP085::readAltitude(float sealevelPressure) {
   return altitude;
 }
 
+float Adafruit_BMP085::readSeaPressure(float altitude) {
+	float sealevelPressure;
+
+	float pressure = readPressure();
+
+	sealevelPressure = pressure / pow( (1.0 - ( altitude / 44330)),5.255);
+
+	return sealevelPressure;
+}
+
 
 /*********************************************************************/
 
 uint8_t Adafruit_BMP085::read8(uint8_t a) {
   uint8_t ret;
 
-  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device 
+  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device
 #if (ARDUINO >= 100)
   Wire.write(a); // sends register address to read from
 #else
   Wire.send(a); // sends register address to read from
 #endif
   Wire.endTransmission(); // end transmission
-  
-  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device 
+
+  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device
   Wire.requestFrom(BMP085_I2CADDR, 1);// send data n-bytes read
 #if (ARDUINO >= 100)
   ret = Wire.read(); // receive DATA
@@ -253,15 +263,15 @@ uint8_t Adafruit_BMP085::read8(uint8_t a) {
 uint16_t Adafruit_BMP085::read16(uint8_t a) {
   uint16_t ret;
 
-  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device 
+  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device
 #if (ARDUINO >= 100)
   Wire.write(a); // sends register address to read from
 #else
   Wire.send(a); // sends register address to read from
 #endif
   Wire.endTransmission(); // end transmission
-  
-  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device 
+
+  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device
   Wire.requestFrom(BMP085_I2CADDR, 2);// send data n-bytes read
 #if (ARDUINO >= 100)
   ret = Wire.read(); // receive DATA
@@ -278,7 +288,7 @@ uint16_t Adafruit_BMP085::read16(uint8_t a) {
 }
 
 void Adafruit_BMP085::write8(uint8_t a, uint8_t d) {
-  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device 
+  Wire.beginTransmission(BMP085_I2CADDR); // start transmission to device
 #if (ARDUINO >= 100)
   Wire.write(a); // sends register address to read from
   Wire.write(d);  // write data
