@@ -37,7 +37,7 @@
 #ifdef ENABLE_BMP085
   #include <Adafruit_BMP085.h>
   Adafruit_BMP085 dps;
-  float Temperature = 0, Pressure = 0, Altitude = 0;
+  float Temperature = 0, Pressure = 0, Altitude = 0, seaPressure = 0;
   uint32_t nextBmp085 = 0;
 #endif /* ENABLE_BMP085 */
 
@@ -111,13 +111,17 @@ void loop()
       Temperature = dps.readTemperature();
       Pressure = dps.readPressure();
       Altitude = dps.readAltitude();
+      seaPressure = dps.readSeaPressure(10); //change this 10 to be the altitude in meters as reported by gps
       
       Serial.print("  Temp(C):");
       Serial.print(Temperature);
       Serial.print("  Pressure(Pa):");
       Serial.print(Pressure);
       Serial.print("  Alt(m):");
-      Serial.println(Altitude);
+      Serial.print(Altitude);
+      Serial.print("  Calc Sealevel Pressure:");
+      Serial.println(seaPressure);
+
     }
   #endif 
   
@@ -151,6 +155,8 @@ void loop()
     dtostrf(Pressure, 8, 1, press); 
     char alt[8];
     dtostrf(Altitude, 4, 1, alt); 
+    char spress[9];
+    dtostrf(seaPressure, 8, 1, spress);
     utime = (String) now.unixtime();
     char ryear[5];
     dtostrf(now.year(), 4, 0, ryear);
@@ -166,15 +172,14 @@ void loop()
     dtostrf(now.second(), 2, 0, rsec);
     record = (utime + comma + ryear + slash + rmonth + slash + rday + space + rhour + colon + rmin + colon + rsec + comma +
               xAxisRawData + comma + yAxisRawData + comma + zAxisRawData + comma +
-              temp + comma + press + comma + alt);
+              temp + comma + press + comma + alt + spress);
     File dataFile = SD.open("LOG.csv", FILE_WRITE);
     if (dataFile)
     
     {
       dataFile.println(record);
-      dataFile.close();
-
-      Serial.println(record);
+ïp‚úAj%ïÑû:}Þlose();
+0—sÔzÀerial.println(record);
     }
     else
     {
