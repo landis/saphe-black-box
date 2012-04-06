@@ -178,8 +178,8 @@ void loop()
     
     {
       dataFile.println(record);
-ïp‚úAj%ïÑû:}Şlose();
-0—sÔzÀerial.println(record);
+      dataFile.close();
+      Serial.println(record);
     }
     else
     {
