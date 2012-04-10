@@ -1,20 +1,14 @@
-
-
-
 /*** to use the SD Card datalogger shield with an Arduino Mega:
      change: #define MEGA_SOFT_SPI 0
          to: #define MEGA_SOFT_SPI 1
-     in the file libraries\S
-     
-     
-     D\utility\Sd2Card.h 
+     in the file libraries\SD\utility\Sd2Card.h 
 ***/
  
 /*** Configuration options ***/
 
 /* Sensors */
-#define ENABLE_BMP085
-#define ENABLE_ADXL
+//#define ENABLE_BMP085
+//#define ENABLE_ADXL
 #define ENABLE_SDLOG
 #define ENABLE_TFT
 
@@ -23,18 +17,24 @@
 #ifdef ENABLE_SDLOG
   #include <SD.h>
   #include "RTClib.h"
+  #define redLEDpin 2
+  #define greenLEDpin 3
   RTC_DS1307 RTC;
   const int sdCS = 10;
 #endif
 
 /* TFT Screen */
 #ifdef ENABLE_TFT
-  #include <Adafruit_GFX.h>     //Core graphics library
-  #include <Adafruit_ST7735.h>  //Hardware specific library
-  #include <SPI.h>
+  // 47 = red
+  // 51 = yellow
+  // 52 = green
+  // 53 = orange
   #define tftcs 53
   #define tftdc 47
   #define rst 8
+  #include <Adafruit_GFX.h>     //Core graphics library
+  #include <Adafruit_ST7735.h>  //Hardware specific library
+  #include <SPI.h>
   Adafruit_ST7735 tft = Adafruit_ST7735(tftcs, tftdc, rst);
 #endif
 
@@ -64,10 +64,19 @@ void setup()
   Serial.println("SAPHE Telemetry Payload");
   
   /* Setup the TFT */
-  #ifdef ENABLE_TFT
+  #if defined(ENABLE_TFT)
     tft.initR(INITR_REDTAB);
     tft.fillScreen(ST7735_BLACK);
-    testdrawtext("This is a test", ST7735_WHITE);
+    tft.setRotation(1);
+    tft.drawString(0, 0, "Project SAPHE", ST7735_WHITE);
+    //tft.drawString(0, 20, "Log", ST7735_WHITE);
+    tft.drawString(0, 50, "Lat", ST7735_WHITE);
+    tft.drawString(80, 50, "Lon", ST7735_WHITE);
+    tft.drawString(0, 80, "Speed", ST7735_WHITE);
+    tft.drawString(50, 80, "Altitude", ST7735_WHITE);
+    tft.drawString(0, 110, "Pa", ST7735_WHITE);
+    tft.drawString(50, 110, "Int Temp", ST7735_WHITE);
+    tft.drawString(110, 110, "Ext Temp", ST7735_WHITE);
     delay(1000);
   #endif
   
@@ -76,10 +85,14 @@ void setup()
     Serial.print("Initializing SD Card...");
     pinMode(10, OUTPUT);
     if (!SD.begin(sdCS)) {
+      digitalWrite(redLEDpin, HIGH);
       Serial.println("Card failed, or not present");
       return;
     }
+    digitalWrite(greenLEDpin, HIGH);
     Serial.println("card initialized.");
+    delay(500);
+    digitalWrite(greenLEDpin, LOW);
     
     File logFile = SD.open("LOG.csv", FILE_WRITE);
     if (logFile)
@@ -121,7 +134,7 @@ void setup()
   #endif
   
   delay(1000);
-};
+}
 
 void loop()
 {
@@ -160,7 +173,7 @@ void loop()
     Serial.println(raw.ZAxis);
   #endif
   
-  #ifdef ENABLE_SDLOG
+  #if defined(ENABLE_SDLOG) && defined(ENABLE_BMP085)
     DateTime now = RTC.now();
     String record;
     String comma = ",";
@@ -204,6 +217,18 @@ void loop()
     {
       Serial.println("error opening LOG.csv");
     }
+  #endif
+  
+  #if defined(ENABLE_TFT)
+    tft.setRotation(1);
+    //tft.drawString(0, 30, "LOG001.CSV", ST7735_WHITE);
+    tft.drawString(0, 60, "40.032 N", ST7735_WHITE);
+    tft.drawString(80, 60, "76.253 W", ST7735_WHITE);
+    tft.drawString(0, 90, "47.2", ST7735_WHITE);
+    tft.drawString(50, 90, "116", ST7735_WHITE);
+    tft.drawString(0, 120, "101000", ST7735_WHITE);
+    tft.drawString(50, 120, "-25.6", ST7735_WHITE);
+    tft.drawString(110, 120, "-50.5", ST7735_WHITE);
   #endif
   
   delay(1000);
