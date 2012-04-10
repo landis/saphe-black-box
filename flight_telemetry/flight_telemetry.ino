@@ -16,6 +16,8 @@
 #define ENABLE_BMP085
 #define ENABLE_ADXL
 #define ENABLE_SDLOG
+#define ENABLE_TFT
+
 
 /* SD Shield */
 #ifdef ENABLE_SDLOG
@@ -25,12 +27,21 @@
   const int sdCS = 10;
 #endif
 
+/* TFT Screen */
+#ifdef ENABLE_TFT
+  #include <Adafruit_GFX.h>     //Core graphics library
+  #include <Adafruit_ST7735.h>  //Hardware specific library
+  #include <SPI.h>
+  #define tftcs 53
+  #define tftdc 47
+  #define rst 8
+  Adafruit_ST7735 tft = Adafruit_ST7735(tftcs, tftdc, rst);
+#endif
+
 /* I2C */
 #if defined(ENABLE_BMP085) || defined(ENABLE_ADXL)
   #include <Wire.h>
   #include <Math.h>
-  
-  
 #endif
 
 /* Barometer */
@@ -51,6 +62,14 @@ void setup()
 {
   Serial.begin(57600);
   Serial.println("SAPHE Telemetry Payload");
+  
+  /* Setup the TFT */
+  #ifdef ENABLE_TFT
+    tft.initR(INITR_REDTAB);
+    tft.fillScreen(ST7735_BLACK);
+    testdrawtext("This is a test", ST7735_WHITE);
+    delay(1000);
+  #endif
   
   /* Setup the SD Log */
   #ifdef ENABLE_SDLOG
@@ -99,7 +118,7 @@ void setup()
     }   
     accel.EnableMeasurements();
     
-    #endif
+  #endif
   
   delay(1000);
 };
@@ -188,4 +207,8 @@ void loop()
   #endif
   
   delay(1000);
-};
+}
+
+void testdrawtext(char *text, uint16_t color) {
+  tft.drawString(0, 0, text, color);
+}
