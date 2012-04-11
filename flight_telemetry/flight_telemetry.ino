@@ -18,7 +18,8 @@
 #ifdef ENABLE_GPS
   #include <Adafruit_GPS.h>
   #include <SoftwareSerial.h>
-  SoftwareSerial mySerial(30, 32);
+  SoftwareSerial mySerial(50, 40);
+  //RX40 TX50
   #define GPSECHO true
   Adafruit_GPS GPS(&mySerial);
   boolean usingInterrupt = false;
@@ -73,9 +74,10 @@
 #ifdef ENABLE_THERM
   #include <max6675.h>
   //change these pins
-  int thermDO = 4;
-  int thermCS = 5;
-  int thermCLK = 6;
+  int thermoDO = 36;
+  int thermoCS = 37;
+  int thermoCLK = 39;
+  MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
   uint8_t degree[8]  = {140,146,146,140,128,128,128,128};
 #endif
 
@@ -125,12 +127,14 @@ void setup()
     GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
     GPS.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
     useInterrupt(true);
+    delay(1000);
   #endif
   
   /* Setup the TFT */
   #if defined(ENABLE_TFT)
     tft.initR(INITR_REDTAB);
     tft.fillScreen(ST7735_BLACK);
+    tft.setRotation(1);
     tft.drawString(0, 0, "Project SAPHE", ST7735_WHITE);
   #endif
   
@@ -141,6 +145,7 @@ void setup()
     tft.drawString(80, 50, "Lon", ST7735_WHITE);
     tft.drawString(0, 80, "Speed", ST7735_WHITE);
     tft.drawString(50, 80, "Altitude", ST7735_WHITE);
+    tft.drawString(120, 80, "Sats", ST7735_WHITE);
   #endif
   
   #if defined(ENABLE_TFT) && defined(ENABLE_BMP085)
@@ -308,7 +313,7 @@ void loop()
     String utime;
     char temp[6];
     dtostrf(Temperature, 4, 2, temp); 
-    char press[9]; dtostrf(Pressure, 8, 1, press); 
+    char press[9]; dtostrf(Pressure, 6, 0, press);
     char alt[8]; dtostrf(Altitude, 4, 1, alt); 
     char spress[9]; dtostrf(seaPressure, 8, 1, spress);
     utime = (String) now.unixtime();
@@ -323,7 +328,7 @@ void loop()
     record = (utime + comma + ryear + slash + rmonth + slash + rday + space + rhour + colon + rmin + colon + rsec + comma +
               xAxisRawData + comma + yAxisRawData + comma + zAxisRawData + comma +
               temp + comma + press + comma + alt + spress);
-    
+
     File dataFile = SD.open("LOG.csv", FILE_WRITE);
     if (dataFile)
     {
@@ -350,23 +355,43 @@ void loop()
   
   #if defined(ENABLE_TFT) && defined(ENABLE_GPS)
     tft.setRotation(1);
-    tft.drawString(0, 60, "40.032 N", ST7735_WHITE);
-    tft.drawString(80, 60, "76.253 W", ST7735_WHITE);
-    tft.drawString(0, 90, "47.2", ST7735_WHITE);
-    tft.drawString(50, 90, "116", ST7735_WHITE);
+    
+    char lat[10];
+    char lon[10];
+    char gspd[10];
+    char galt[10];
+    char gsat[5];
+    dtostrf(GPS.latitude, 9, 4, lat);
+    dtostrf(GPS.longitude, 9, 4, lon);
+    dtostrf(GPS.speed, 4, 1, gspd);
+    dtostrf(GPS.altitude, 7, 0, galt);
+    dtostrf(GPS.satellites, 3, 0, gsat);
+    //4002.2719N, 7503.6269W
+    tft.drawString(0, 60, lat, ST7735_WHITE);
+    tft.drawString(80, 60, lon, ST7735_WHITE);
+    tft.drawString(0, 90, gspd, ST7735_WHITE);
+    tft.drawString(50, 90, galt, ST7735_WHITE);
+    tft.drawString(120, 90, gsat, ST7735_WHITE);
   #endif
-  
-  #if defined(ENABLED_TFT) && defined(ENABLE_BMP085)
+
+  #if defined(ENABLE_TFT) && defined(ENABLE_BMP085)
     tft.setRotation(1);
-    tft.drawString(0, 120, "101000", ST7735_WHITE);
-    tft.drawString(50, 120, "-25.6", ST7735_WHITE);
+    tft.drawString(0, 120, press, ST7735_WHITE);
+    tft.drawString(50, 120, temp, ST7735_WHITE);
   #endif
   
-  #if defined(ENABLED_TFT) && defined(ENABLE_THERM)
+  #if defined(ENABLE_TFT) && defined(ENABLE_THERM)
+
     Serial.println(thermocouple.readCelsius());
     Serial.println(thermocouple.readFarenheit());
+    double cels = thermocouple.readCelsius();
+    char ccels[10];
+    dtostrf(cels, 7, 2, ccels);
+    //Serial.println(scels);
+    //char scels_char[scels.length() + 1];
+    //cels.toCharArray(scels_char, sizeof(scels_char));
     tft.setRotation(1);
-    tft.drawString(110, 120, thermocouple.readCelsius(), ST7735_WHITE);
+    tft.drawString(100, 120, ccels, ST7735_WHITE);
   #endif
   
   delay(10);
