@@ -12,7 +12,7 @@
 #define ENABLE_SDLOG
 #define ENABLE_TFT
 #define ENABLE_GPS
-#define ENABLE_THERM
+//#define ENABLE_THERM
 
 /* GPS */
 #ifdef ENABLE_GPS
@@ -20,7 +20,7 @@
   #include <SoftwareSerial.h>
   SoftwareSerial mySerial(50, 40);
   //RX40 TX50
-  #define GPSECHO true
+  #define GPSECHO false
   Adafruit_GPS GPS(&mySerial);
   boolean usingInterrupt = false;
 #endif
@@ -109,11 +109,23 @@ void setup()
     if (logFile)
     {
       digitalWrite(greenLEDpin, HIGH);
-      String header = "ID,RTCtimestamp,X,Y,Z,TempC,PressurePA,AltitudeM,CAltitudeM,Latitude,Longitude,Knots,GPSAltitude,Satelites,Fix,Quality,Angle,GPStimestamp,ThermTempC";
+      String header = "ID,RTCtimestamp";
+      #if defined(ENABLE_ADXL)
+        header += ",X,Y,Z";
+      #endif
+      #if defined(ENABLE_BMP085)
+        header += ",TempC,PressurePA,AltitudeM,CAltitudeM";
+      #endif
+      #if defined(ENABLE_GPS)
+        header += ",Latitude,Longitude,Knots,GPSAltitude,Satelites,Fix,Quality,Angle,GPStimestamp";
+      #endif
+      #if defined(ENABLE_THERM)
+        header += ",ThermTempC";
+      #endif
       logFile.println(header);
       logFile.close();
       digitalWrite(greenLEDpin, LOW);
-      Serial.println(header);
+      //Serial.println(header);
     }
     else
     {
@@ -141,7 +153,6 @@ void setup()
   
   #if defined(ENABLE_TFT) && defined(ENABLE_GPS)
     tft.setRotation(1);
-    //tft.drawString(0, 20, "Log", ST7735_WHITE);
     tft.drawString(0, 50, "Lat", ST7735_WHITE);
     tft.drawString(80, 50, "Lon", ST7735_WHITE);
     tft.drawString(0, 80, "Speed", ST7735_WHITE);
@@ -187,32 +198,34 @@ void setup()
   delay(1000);
 }
 
-/* GPS Interupt */
-// Interrupt is called once a millisecond, looks for any new GPS data, and stores it
-SIGNAL(TIMER0_COMPA_vect) {
-  char c = GPS.read();
-  // if you want to debug, this is a good time to do it!
-  if (GPSECHO)
-    if (c) UDR0 = c;  
-    // writing direct to UDR0 is much much faster than Serial.print 
-    // but only one character can be written at a time. 
-}
-
-void useInterrupt(boolean v) {
-  if (v) {
-    // Timer0 is already used for millis() - we'll just interrupt somewhere
-    // in the middle and call the "Compare A" function above
-    OCR0A = 0xAF;
-    TIMSK0 |= _BV(OCIE0A);
-    usingInterrupt = true;
-  } else {
-    // do not call the interrupt function COMPA anymore
-    TIMSK0 &= ~_BV(OCIE0A);
-    usingInterrupt = false;
+#ifdef ENABLE_GPS
+  /* GPS Interupt */
+  // Interrupt is called once a millisecond, looks for any new GPS data, and stores it
+  SIGNAL(TIMER0_COMPA_vect) {
+    char c = GPS.read();
+    // if you want to debug, this is a good time to do it!
+    if (GPSECHO)
+      if (c) UDR0 = c;  
+      // writing direct to UDR0 is much much faster than Serial.print 
+      // but only one character can be written at a time. 
   }
-}
 
-uint16_t timer = millis();
+  void useInterrupt(boolean v) {
+    if (v) {
+      // Timer0 is already used for millis() - we'll just interrupt somewhere
+      // in the middle and call the "Compare A" function above
+      OCR0A = 0xAF;
+      TIMSK0 |= _BV(OCIE0A);
+      usingInterrupt = true;
+    } else {
+      // do not call the interrupt function COMPA anymore
+      TIMSK0 &= ~_BV(OCIE0A);
+      usingInterrupt = false;
+    }
+  }
+
+  uint16_t timer = millis();
+#endif
 
 void loop()
 {
@@ -241,29 +254,27 @@ void loop()
     // approximately every 2 seconds or so, print out the current stats
     if (millis() - timer > 2000) { 
       timer = millis(); // reset the timer
-    
-      Serial.print("\nTime: ");
-      Serial.print(GPS.hour, DEC); Serial.print(':');
-      Serial.print(GPS.minute, DEC); Serial.print(':');
-      Serial.print(GPS.seconds, DEC); Serial.print('.');
-      Serial.println(GPS.milliseconds);
-      Serial.print("Date: ");
-      Serial.print(GPS.day, DEC); Serial.print('/');
-      Serial.print(GPS.month, DEC); Serial.print("/20");
-      Serial.println(GPS.year, DEC);
-      Serial.print("Fix: "); Serial.print(GPS.fix);
-      Serial.print(" quality: "); Serial.println(GPS.fixquality); 
-      if (GPS.fix) {
-        Serial.print("Location: ");
-        Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
-        Serial.print(", "); 
-        Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
-      
-        Serial.print("Speed (knots): "); Serial.println(GPS.speed);
-        Serial.print("Angle: "); Serial.println(GPS.angle);
-        Serial.print("Altitude: "); Serial.println(GPS.altitude);
-        Serial.print("Satellites: "); Serial.println(GPS.satellites);
-      }
+//      Serial.print("\nTime: ");
+//      Serial.print(GPS.hour, DEC); Serial.print(':');
+//      Serial.print(GPS.minute, DEC); Serial.print(':');
+//      Serial.print(GPS.seconds, DEC); Serial.print('.');
+//      Serial.println(GPS.milliseconds);
+//      Serial.print("Date: ");
+//      Serial.print(GPS.day, DEC); Serial.print('/');
+//      Serial.print(GPS.month, DEC); Serial.print("/20");
+//      Serial.println(GPS.year, DEC);
+//      Serial.print("Fix: "); Serial.print(GPS.fix);
+//      Serial.print(" quality: "); Serial.println(GPS.fixquality); 
+//      if (GPS.fix) {
+//        Serial.print("Location: ");
+//        Serial.print(GPS.latitude, 4); Serial.print(GPS.lat);
+//        Serial.print(", "); 
+//        Serial.print(GPS.longitude, 4); Serial.println(GPS.lon);
+//        Serial.print("Speed (knots): "); Serial.println(GPS.speed);
+//        Serial.print("Angle: "); Serial.println(GPS.angle);
+//        Serial.print("Altitude: "); Serial.println(GPS.altitude);
+//        Serial.print("Satellites: "); Serial.println(GPS.satellites);
+//      }
     }
   #endif
   
@@ -300,7 +311,6 @@ void loop()
     char gmon[2]; dtostrf(GPS.month, 1, 0, gmon);
     char gyeara[3]; dtostrf(GPS.year, 2, 0, gyeara);
     String milen("20");
-    String gyearb = gyeara;
     String gyearc = String(milen + gyeara);
     char gfix[5]; dtostrf(GPS.fix, 2, 0, gfix);
     char gqual[5]; dtostrf(GPS.fixquality, 2, 0, gqual);
@@ -314,14 +324,14 @@ void loop()
       Pressure = dps.readPressure();
       Altitude = dps.readAltitude();
       calcAltitude = dps.readAltitude(101964); //change curPress to actual pressure (PA) as reported weather.com
-      Serial.print("  Temp(C):");
-      Serial.print(Temperature);
-      Serial.print("  Pressure(Pa):");
-      Serial.print(Pressure);
-      Serial.print("  Alt(m):");
-      Serial.print(Altitude);
-      Serial.print("  Calc Altitude:");
-      Serial.println(calcAltitude);
+//      Serial.print("Temp(C):");
+//      Serial.print(Temperature);
+//      Serial.print("  Pressure(Pa):");
+//      Serial.print(Pressure);
+//      Serial.print("  Alt(m):");
+//      Serial.print(Altitude);
+//      Serial.print("  Calc Altitude:");
+//      Serial.println(calcAltitude);
     }
   #endif 
 
@@ -341,37 +351,54 @@ void loop()
     int zAxisRawData = raw.ZAxis;
     AccelerometerScaled scaled = accel.ReadScaledAxis();
     float xAxisGs = scaled.XAxis;
-    
-    Serial.print("X: ");
-    Serial.print(raw.XAxis);
-    Serial.print("   Y: ");
-    Serial.print(raw.YAxis);
-    Serial.print("   Z: ");
-    Serial.println(raw.ZAxis);
+//    Serial.print("X: ");
+//    Serial.print(raw.XAxis);
+//    Serial.print("   Y: ");
+//    Serial.print(raw.YAxis);
+//    Serial.print("   Z: ");
+//    Serial.println(raw.ZAxis);
   #endif
   
   #if defined(ENABLE_THERM)
-    Serial.println(thermocouple.readCelsius());
-    Serial.println(thermocouple.readFarenheit());
+//    Serial.println(thermocouple.readCelsius());
+//    Serial.println(thermocouple.readFarenheit());
     double cels = thermocouple.readCelsius();
     char ccels[10]; dtostrf(cels, 7, 2, ccels);
   #endif
   
   #if defined(ENABLE_SDLOG) && defined(ENABLE_BMP085) && defined(ENABLE_ADXL)
     String record;
-    record = /* RTC */ (utime + comma + ryear + slash + rmonth + slash + rday + 
-                        space + rhour + colon + rmin + colon + rsec + comma +
-             /* AXL */  xAxisRawData + comma + yAxisRawData + comma + zAxisRawData + comma +
-             /* BMP */  temp + comma + press + comma + alt + comma + calt + comma +
-             /* GPS */  lat + comma + lon + comma + gspd + comma + galt + comma + 
-                        gsat + comma + gfix + comma + gqual + comma + gang + comma +
-                        gyearc + slash + gmon + slash + gday + space + 
-                        ghour + colon + gmin + colon + gsec + comma +
-             /* THM */  ccels);
-    Serial.println();
-    String testgtime = (gyearc + slash + gmon + slash + gday + space + ghour + colon + gmin + colon + gsec + comma);
-    Serial.println(testgtime);
-    Serial.println();
+
+/* RTC */    
+    record = (utime + comma + ryear + slash + rmonth + slash + rday + 
+              space + rhour + colon + rmin + colon + rsec + comma);
+/* AXL */
+    #if defined(ENABLE_ADXL)
+      record += (xAxisRawData + comma + yAxisRawData + comma + zAxisRawData + comma);
+    #endif  
+
+/* BMP */
+    #if defined(ENABLE_BMP085)
+      record += (temp + comma + press + comma + alt + comma + calt + comma);
+    #endif
+
+/* GPS */
+    #if defined(ENABLE_GPS)
+      record += (lat + comma + lon + comma + gspd + comma + galt + comma + 
+                 gsat + comma + gfix + comma + gqual + comma + gang + comma +
+                 gyearc + slash + gmon + slash + gday + space + 
+                 ghour + colon + gmin + colon + gsec + comma);
+    #endif
+  
+/* THM */
+    #if defined(ENABLE_THERM)
+      record += (ccels);
+    #endif
+  
+//    Serial.println();
+//    String testgtime = (gyearc + slash + gmon + slash + gday + space + ghour + colon + gmin + colon + gsec + comma);
+//    Serial.println(testgtime);
+//    Serial.println();
     File dataFile = SD.open("LOG001.csv", FILE_WRITE);
     if (dataFile)
     {
@@ -384,15 +411,16 @@ void loop()
     else
     {
       digitalWrite(redLEDpin, HIGH);
-      Serial.println("error opening LOG.csv");
+      Serial.println("error opening LOG001.csv");
     }
   #endif
   
   #if defined(ENABLE_TFT) && defined(ENABLE_SDLOG)
-    char time_char[rtimestamp.length() + 1];
-    rtimestamp.toCharArray(time_char, sizeof(time_char));
+    char time_char[32];
+    rtimestamp.toCharArray(time_char, 32);
     tft.setRotation(1);
     tft.drawString(0, 20, time_char, ST7735_WHITE);
+    //tft.drawString(0, 20, rtimestamp, ST7735_WHITE);
     tft.drawString(0, 30, "LOG001.CSV", ST7735_WHITE);
   #endif
   
@@ -413,7 +441,6 @@ void loop()
   #endif
   
   #if defined(ENABLE_TFT) && defined(ENABLE_THERM)
-
     //Serial.println(scels);
     //char scels_char[scels.length() + 1];
     //cels.toCharArray(scels_char, sizeof(scels_char));
@@ -421,12 +448,8 @@ void loop()
     tft.drawString(100, 120, ccels, ST7735_WHITE);
   #endif
   
-  delay(10);
-  digitalWrite(redLEDpin, LOW);
-  digitalWrite(greenLEDpin, LOW);
+//  delay(10);
+//  digitalWrite(redLEDpin, LOW);
+//  digitalWrite(greenLEDpin, LOW);
   delay(1000);
-}
-
-void testdrawtext(char *text, uint16_t color) {
-  tft.drawString(0, 0, text, color);
 }
