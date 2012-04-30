@@ -89,8 +89,17 @@ void setup()
   
     /* Setup the SD Log */
   #ifdef ENABLE_SDLOG
+    Wire.begin();
+    RTC.begin();
     digitalWrite(greenLEDpin, HIGH);
     digitalWrite(redLEDpin, HIGH);
+
+    if (! RTC.isrunning()) {
+      Serial.println("RTC is NOT running!");
+      // following line sets the RTC to the date & time this sketch was compiled
+      RTC.adjust(DateTime(__DATE__, __TIME__));
+    }
+
     Serial.print("Initializing SD Card...");
     pinMode(sdCS, OUTPUT);
     if (!SD.begin(sdCS)) {
@@ -182,7 +191,7 @@ void setup()
     nextBmp085 = millis() + 1000;
     delay(500);
   #endif /* ENABLE_BMP085 */
-  
+
   #if defined(ENABLE_ADXL)
     accel = ADXL345();
     if(accel.EnsureConnected()){
@@ -190,11 +199,9 @@ void setup()
     }
     else {
       Serial.println("Could not connect to ADXL");
-    }   
+    }
     accel.EnableMeasurements();
-    
   #endif
-  
   delay(1000);
 }
 
@@ -277,15 +284,15 @@ void loop()
 //      }
     }
   #endif
-  
+
   // IF SD Datalogger shield enabled, Put RTC info into variables //
   #if defined(ENABLE_SDLOG)
-    DateTime now = RTC.now();
     String utime;
     String rtimestamp;
     String comma = ","; String colon = ":";
     String slash = "/"; String space = " ";
     String dot = ".";
+    DateTime now = RTC.now();
     utime = (String) now.unixtime();
     char ryear[5]; dtostrf(now.year(), 4, 0, ryear);
     char rmonth[3]; dtostrf(now.month(), 2, 0, rmonth);
@@ -293,8 +300,14 @@ void loop()
     char rhour[3]; dtostrf(now.hour(), 2, 0, rhour);
     char rmin[3]; dtostrf(now.minute(), 2, 0, rmin);
     char rsec[3]; dtostrf(now.second(), 2, 0, rsec);
-    rtimestamp = (ryear + slash + rmonth + slash + rday + space
+
+    if (! RTC.isrunning()) {
+      rtimestamp = "RTC is NOT running!";
+    }
+    else {
+      rtimestamp = (ryear + slash + rmonth + slash + rday + space
                   + rhour + colon + rmin + colon + rsec);
+    }
   #endif
 
   // IF GPS is connected and SD Logger, read into variables //
